@@ -7,14 +7,19 @@ the same grain overhead.
 A [Tweaker](https://github.com/Audiosurf-Tweaker/Audiosurf-Tweaker) sky package. One fullsky shader,
 no textures, no geometry.
 
-| calm | loud |
-|---|---|
-| ![calm](media/quiet.jpg) | ![loud](media/level.jpg) |
+![in game, loud](media/ingame-discoball.jpg)
 
-![looking up](media/up.jpg)
+![in game, quiet](media/ingame-neon.jpg)
 
-*(CPU preview renders of the shader's own maths, not in-game screenshots. The real frame is
-2560×1440 at a narrower field of view, so everything here appears larger.)*
+*Gameplay at 2560×1440, downscaled. The track, blocks, vehicles and the HUD belong to the game; the
+sky behind them is this package.*
+
+The shader on its own, with no track in the way — the same maths the plugin runs, rendered on the CPU
+so a change can be seen without launching the game:
+
+| calm | loud | looking up |
+|---|---|---|
+| ![calm](media/quiet.jpg) | ![loud](media/level.jpg) | ![looking up](media/up.jpg) |
 
 ## Install
 

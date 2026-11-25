@@ -1,0 +1,238 @@
+// Nano Neon - an electronic/neon sky in the spirit of Audiosurf 2's "the grid".
+// Format: https://github.com/Unchpokable/Audiosurf-Tweaker/blob/HEAD/Docs/skyboxes/manifest.md
+//
+// Every `var` below names a register the compiled shader really declares. That is not pedantry:
+// fxc drops a uniform the shader never reads, and a param pointing at one has nowhere to write -
+// it just silently does nothing. This list was checked against the constant table of the compiled
+// ps_3_0 bytecode, not against the shader source.
+//
+// Register map (c0-c5 are the plugin's, c208-c223 are the engine's):
+//   c6  g_pal_a    c7  g_pal_b    c8  g_pal_drive   c9  g_glow
+//   c10 g_towers   c11 g_floor    c12 g_pal_path    c13 g_mosaic
+//   c15 g_particles   c16 g_particles_drive
+//   c21 g_master   c22 g_debug    c23 g_band_mix
+{
+    "format": 1,
+
+  // Numbers several layers have to agree about. A value declared here is a knob once and a register
+  // in every layer that binds it - which is the only way two shaders can be guaranteed to mean the
+  // same colour, rather than two sliders that have to be kept in step by hand.
+  "shared": {
+    "values": [
+      { "id": "pal_a",      "label": "Palette from",    "default": [0.50772417, 0.36357337, 0.78947365] },
+      { "id": "pal_b",      "label": "Palette to",      "default": [0.95, 0.36, 0.30] },
+      { "id": "pal_window", "label": "Palette window",  "default": 0,  "min": 0, "max": 4 },
+      { "id": "pal_gain",   "label": "Palette gain",    "default": 3, "min": 0, "max": 3 },
+      { "id": "pal_curve",  "label": "Palette curve",   "default": 2.700599,  "min": 0.2, "max": 5 },
+      // At 1.0 the colour is pinned to the hot end forever, whatever the music does. Leave at 0.
+      { "id": "pal_floor",  "label": "Minimum heat",    "default": 0.14371258,  "min": 0, "max": 1 },
+      { "id": "pal_path",   "label": "Hue path (0/1)",  "default": 1,    "min": 0, "max": 1 },
+      { "id": "pal_sat",    "label": "Saturation",      "default": 1.0179641,  "min": 0.0, "max": 2.0 }
+    ]
+  },
+
+  // Also the installed file name ("<name>.sky") and the settings key - renaming makes it a new sky.
+  "name": "Nano Neon",
+  "author": "Audiosurf Tweaker",
+
+  // Bumped from 1: the register layout changed completely (the old g_sun/g_pulse at c6-c8 are gone),
+  // so values a player saved against the old meaning must not be reapplied.
+  "version": 2,
+
+  "layers": [
+    {
+      "id": "sky",
+      "kind": "fullsky",
+      "shader": "shaders/sky.hlsl",
+
+      // The palette arrives here, not from this layer's own params: the debris layer binds the very
+      // same values, so a chip in flight is guaranteed to be the colour of the sky behind it.
+      "bind": {
+        "g_pal_a.xyz":    "values.pal_a",
+        "g_pal_b.xyz":    "values.pal_b",
+        "g_pal_drive.x":  "values.pal_window",
+        "g_pal_drive.y":  "values.pal_gain",
+        "g_pal_drive.z":  "values.pal_curve",
+        "g_pal_drive.w":  "values.pal_floor",
+        "g_pal_path.x":   "values.pal_path",
+        "g_extra.y":      "values.pal_sat"
+      },
+
+      // The music registers are written by the engine every frame and must not appear below.
+      "params": [
+        {
+          "group": "Colour",
+          "params": [
+            // The palette itself moved to the sky's "shared" block, because the debris layer has to
+            // use THE SAME colours or the chips read as a different material floating in front of
+            // the sky. One picker, two layers, no way for them to drift apart. Bindings are below.
+            { "var": "g_extra.x", "label": "Void depth", "default": 0.1, "min": 0.0, "max": 0.10 }
+          ]
+        },
+        {
+          "group": "Horizon",
+          "params": [
+            // Sigma of the band in degrees. Measured off the reference frames: 0.72 at the horizon,
+            // 0.06 at 12 % of frame height above it - about four degrees.
+            { "var": "g_glow.x", "label": "Glow height",   "default": 5.194611,  "min": 0.5, "max": 25 },
+            { "var": "g_glow.y", "label": "Glow strength", "default": 1.7065868, "min": 0,   "max": 3 },
+            { "var": "g_glow.z", "label": "Glow crest",    "default": 0.96407187, "min": 0,   "max": 1 }
+          ]
+        },
+        {
+          "group": "Towers",
+          "params": [
+            // Two numbers decide everything about the columns, and both are the player's:
+            // Max height is how far they reach at the loudest moment of the track, and Music gain
+            // is the multiplier that makes the current track actually get there.
+            { "var": "g_towers.x", "label": "Max height (deg)", "default": 33.05389, "min": 0, "max": 60 },
+            { "var": "g_towers.z", "label": "Music gain",       "default": 3.209581,  "min": 0, "max": 8 },
+            { "var": "g_towers.w", "label": "Brightness",       "default": 4, "min": 0, "max": 4 },
+            // g_music_eq is the instantaneous spectrum and a pixel shader cannot filter it. This
+            // slides the whole field toward the 4 s body, which is smooth by construction: at 1
+            // every column is the same height and only the breathing is left.
+            { "var": "g_eq_extra.x", "label": "Smoothing",      "default": 0.6047904, "min": 0, "max": 1 },
+            // What survives silence. 0 is nothing at all, which is the specified behaviour.
+            { "var": "g_eq_extra.y", "label": "Floor (deg)",    "default": 0.11976048,  "min": 0, "max": 20 },
+            // Fraction of the slot a bar occupies. 1.0 is a continuous wall, 0.7 gives the bars
+            // visible sides, which is what makes them read as bars rather than as a mass.
+            { "var": "g_eq_extra.z", "label": "Bar width",      "default": 1, "min": 0.05, "max": 1 },
+            // How many times the eight-slot palindrome [x y z w w z y x] is drawn around the
+            // ring. At 2 the doubling of x and w is obvious; by a couple of dozen it is not.
+            { "var": "g_eq_extra.w", "label": "Band wrap count",  "default": 96, "min": 1, "max": 96 },
+            // How different the repeated cycles are allowed to look. The multiplier is drawn
+            // per eight-slot cell; equal bounds switch it off, and an upper bound above 1
+            // lets the loudest cycles overshoot Max height.
+            { "var": "g_eq_rand.x", "label": "Random low",   "default": 0, "min": 0, "max": 2 },
+            { "var": "g_eq_rand.y", "label": "Random high",  "default": 1.1257485, "min": 0, "max": 2 }
+          ]
+        },
+        {
+          "group": "Floor",
+          "params": [
+            { "var": "g_floor.x", "label": "Grid pitch",      "default": 0.049341317,  "min": 0.02, "max": 1.0 },
+            { "var": "g_floor.y", "label": "Line width",      "default": 0.006694611, "min": 0.002, "max": 0.1 },
+            { "var": "g_floor.z", "label": "Grid brightness", "default": 4,  "min": 0, "max": 4 },
+            // Cells per second. The shader cannot know the ship's speed, so this is the player's to
+            // match by eye - or leave at zero and let the camera's own turning supply the motion.
+            { "var": "g_floor.w", "label": "Grid scroll",     "default": -0.4670658,   "min": -2, "max": 2 }
+          ]
+        },
+        {
+          "group": "Mosaic",
+          "params": [
+            // The fine rectangular grain that the reference floor is actually made of. Without it
+            // the plan reads as graph paper.
+            { "var": "g_mosaic.x", "label": "Density",      "default": 0.675,  "min": 0, "max": 1 },
+            { "var": "g_mosaic.y", "label": "Grain size",   "default": 0.0403625, "min": 0.002, "max": 0.2 },
+            { "var": "g_mosaic.z", "label": "Brightness",   "default": 1.5374999,  "min": 0, "max": 3 },
+            { "var": "g_mosaic.w", "label": "Second layer", "default": 0.3875,  "min": 0, "max": 1 }
+          ]
+        },
+        {
+          "group": "Ceiling",
+          "params": [
+            // The floor's grain, above the player instead of below: the same plan projection on the
+            // other side of the horizon. It fills the one part of the sky that had nothing in it.
+            //
+            // Its own pitch and seeds on purpose - a literal mirror of the floor reads as a
+            // reflection, and a sky is not a room.
+            { "var": "g_ceiling.x", "label": "Density",      "default": 0.46107784,  "min": 0, "max": 1 },
+            { "var": "g_ceiling.y", "label": "Grain size",   "default": 0.031640716, "min": 0.002, "max": 0.2 },
+            // Dimmer than the floor by default: it is overhead, and it must not compete with the
+            // horizon or the bars.
+            { "var": "g_ceiling.z", "label": "Brightness",   "default": 1.8862276,  "min": 0, "max": 3 },
+            { "var": "g_ceiling.w", "label": "Second layer", "default": 0.37724552,  "min": 0, "max": 1 }
+          ]
+        },        {
+          "group": "Particles",
+          "params": [
+            { "var": "g_particles.x", "label": "Density",    "default": 0.477707,  "min": 0, "max": 1 },
+            { "var": "g_particles.y", "label": "Size",       "default": 0.0022484078, "min": 0.001, "max": 0.05 },
+            { "var": "g_particles.z", "label": "Brightness", "default": 1.6050955,  "min": 0, "max": 4 },
+            { "var": "g_particles.w", "label": "Drift",      "default": 1.1210191,  "min": 0, "max": 4 },
+            // Same two axes as the colour, but this is where a narrow window earns its keep.
+            { "var": "g_particles_drive.x", "label": "Music window", "default": 2.227545,  "min": 0, "max": 4 },
+            { "var": "g_particles_drive.y", "label": "Music gain",   "default": 1.0933334,  "min": 0, "max": 4 },
+            { "var": "g_particles_drive.z", "label": "Punch on hit", "default": 0.994012, "min": 0, "max": 2 },
+            { "var": "g_particles_drive.w", "label": "Spectrum mix", "default": 0.5748503, "min": 0, "max": 1 },
+            // How hard the music pushes the field round. Not a speed - a pixel shader has no state
+            // and cannot integrate one - but a surge whose amplitude follows the song, which reads
+            // the same and cannot teleport. 0 leaves only the constant Drift.
+            { "var": "g_particles_extra.x", "label": "Speed from music", "default": 2, "min": 0, "max": 2 },
+            { "var": "g_particles_extra.y", "label": "Surge rate",       "default": 2.0624204, "min": 0.1, "max": 8 },
+            // The one real trade-off at the poles. 1.0 leaves the particle stretched with the
+            // chart (streaks when you look up); 2.0 makes it a screen-square but shrinks it toward
+            // the pole. Somewhere between is the least bad.
+            { "var": "g_particles_extra.z", "label": "Pole bias",        "default": 2.00, "min": 1.0, "max": 2.0 },
+            // Differential shells: the only depth cue a camera pinned to the sphere's centre has.
+            // The far shell running backwards is what makes the field read as a volume rather than
+            // as one flat sheet. 1.0 / 0.45 / -0.25 is a good starting point; a far speed of 0 makes
+            // it static, and two equal speeds make them rigid again.
+            { "var": "g_particles_layers.x", "label": "Speed near",   "default": 0.78980875, "min": -2, "max": 4 },
+            { "var": "g_particles_layers.y", "label": "Speed mid",    "default": -0.19999993, "min": -2, "max": 4 },
+            { "var": "g_particles_layers.z", "label": "Speed far",    "default": -0.81528664, "min": -2, "max": 4 },
+            // Per-particle wander inside its own cell, in cells. Bounded on purpose: the particle
+            // plus its swing must stay inside the cell or it gets sliced at the boundary.
+            { "var": "g_particles_layers.w", "label": "Particle swing", "default": 0.3, "min": 0, "max": 0.30 },
+            // A square turning about its vertical axis projects as width * |cos|, which reads as a
+            // 3D object tumbling rather than as a flat tile sliding.
+            { "var": "g_particles_fx.x", "label": "Tumble", "default": 0.4522293, "min": 0, "max": 1 },
+            // Squeezes the particle across its own flow. Stretching along it would leave the cell.
+            { "var": "g_particles_fx.y", "label": "Streak", "default": 0, "min": 0, "max": 2 },
+            // Elevation drift as a fraction of the azimuthal one. Not decoration: azimuthal
+            // motion is invisible when you look along its axis, and looking up is when the
+            // particles are the whole sky. Keep it small - the elevation axis accelerates
+            // as 1/cos toward the pole.
+            { "var": "g_particles_fx.z", "label": "Vertical drift", "default": 0.15923567, "min": 0, "max": 1 }
+          ]
+        },
+        {
+          "group": "Spectrum",
+          "params": [
+            // Which of the four bands moves the particles. Air (5.4 kHz+) is cymbals and sibilance -
+            // the narrowest thing the game's FFT can honestly offer, and it reads as sparkle.
+            { "var": "g_band_mix.x", "label": "Low weight",  "default": 0.2,  "min": 0, "max": 1 },
+            { "var": "g_band_mix.y", "label": "Mid weight",  "default": 0.23125,  "min": 0, "max": 1 },
+            { "var": "g_band_mix.z", "label": "High weight", "default": 0.3233533, "min": 0, "max": 1 },
+            { "var": "g_band_mix.w", "label": "Air weight",  "default": 0.51875,  "min": 0, "max": 1 }
+          ]
+        },
+        {
+          "group": "Master",
+          "params": [
+            // This is a background for a game that is being played. The references are a screenshot.
+            { "var": "g_master.x", "label": "Brightness",      "default": 0.5389222,  "min": 0, "max": 3 },
+            { "var": "g_master.y", "label": "Grain",           "default": 0.28143713, "min": 0, "max": 1 },
+            { "var": "g_master.z", "label": "Haze",            "default": 0.35029942, "min": 0, "max": 1.5 },
+            // How much the spectrum pumps the floor grid. The equaliser does not read this.
+            { "var": "g_master.w", "label": "Spectrum drive",  "default": 0.6407186, "min": 0, "max": 1 }
+          ]
+        },
+        {
+          "group": "Debug",
+          "params": [
+            // 1 elevation, 2 plane coordinates, 3 pixel footprint, 4 cube domain,
+            // 5 horizon only, 6 equaliser only, 7 floor only, 8 particles only, 9 mosaic only,`n            // 10 the pixel footprint, 11 m = max(|d|) which is smooth on the sphere by construction.
+            // Modes 1-4 need NANO_DEBUG 1 at the top of the shader (it is 1 by default).
+            { "var": "g_debug.x", "label": "Mode", "default": 0, "min": 0, "max": 11 }
+          ]
+        }
+      ]
+    },
+
+    // ---------------------------------------------------------------------------------------------
+    // The debris layer.
+    //
+    // A second layer, not another block in the sky shader, and that is the whole point of it. The
+    // sky shader is a continuous field sampled per pixel: it has no per-object identity, so a
+    // discrete sprite could only be faked - and every artefact this sky has produced came from that
+    // faking: poles, cell clipping, wedges where a particle crossed its cell, folded cells when the
+    // space itself was warped. A sprite layer is real geometry. It has attributes, a vertex shader,
+    // and a billboard basis the engine bakes on the CPU with the pole degeneracy already resolved.
+    //
+    // "fill": { "kind": "shader" } bakes nothing. A sharp chip does not need a texture, and drawing
+    // it analytically keeps the corners sharp at any size instead of paying for an atlas that would
+    // only ever be a white square.
+  ]
+}

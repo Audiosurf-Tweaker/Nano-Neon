@@ -1,0 +1,20 @@
+# Files the Tweaker writes when this folder is opened as a sky project; they belong to the author's
+# machine, not to the package.
+.tweaker/
+shadertoolsconfig.json
+
+# Scratch: the CPU preview renderer, its output, and every intermediate this package's development
+# produced. Large, machine-specific, and not part of what a player gets.
+work/
+.vscode/
+
+# A local copy of the Tweaker's own manual, kept for reference while working. Upstream is the source
+# of truth and this copy is not shipped, so it is not tracked.
+docs/
+
+# A package being written; never a finished one.
+*.partial
+
+# OS junk
+Thumbs.db
+desktop.ini

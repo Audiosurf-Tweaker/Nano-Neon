@@ -1,0 +1,6 @@
+* text=auto
+
+# The shader is compiled with whatever line endings the author's editor uses; normalise on the way in
+# so a diff never shows a whole file rewritten for a whitespace change.
+*.hlsl text eol=lf
+*.hlsli text eol=lf
